@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ExpandedFoldersProvider } from "@/components/folders/ExpandedFoldersContext";
 import { DbGate } from "@/components/layout/DbGate";
 import { Button } from "@/components/ui/Button";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -64,6 +65,8 @@ export function AppShell({ children }: AppShellProps) {
             </Button>
             <span className="text-base font-semibold tracking-tight">KWeb</span>
           </header>
+
+          <UpdateBanner />
 
           <main id="main-content" className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">

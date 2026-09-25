@@ -53,6 +53,20 @@ npm run desktop:build
 
 The installer is written under `src-tauri/target/release/bundle`.
 
+The build signs the update package with the private key at `%USERPROFILE%\.tauri\kweb.key` (password `kweb`). That key stays on this machine. It is not in the repository. If the file is missing, the release build cannot produce an installable update.
+
+## Updates
+
+Installed copies check [the latest GitHub release](https://github.com/zarcaxm/KWeb/releases/latest) on startup. When a newer signed version exists, a banner offers **Update and restart**. The vault folder is not part of the app install, so an update does not change your notes.
+
+The first installer that includes the updater still has to be installed once. Later versions update in place.
+
+To publish a version:
+
+1. Raise `version` in `package.json` and `src-tauri/tauri.conf.json` to the same value.
+2. Run `npm run desktop:build`.
+3. Create a GitHub release and upload `latest.json` plus the Windows setup `.exe` from `src-tauri/target/release/bundle/nsis`. The app downloads `latest.json` from that release.
+
 ## Keyboard
 
 - **Cmd/Ctrl + K** — global search
