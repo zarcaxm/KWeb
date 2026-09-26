@@ -29,40 +29,63 @@ html {
   }
 }
 
-/* —— Writing surface —— */
+/* —— Writing surface: grey frame, white paper —— */
+
+.kweb-editor-frame {
+  border-radius: 0.75rem;
+  border: 1px solid #dcdcdc;
+  background: #ececec;
+  padding: 0.85rem 0.85rem 1.1rem;
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.kweb-editor-frame[data-focused="true"] {
+  border-color: #d0d0d0;
+  background: #e8e8e8;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
 
 .kweb-editor-shell {
   display: flex;
   flex-direction: column;
-  border-radius: 0.5rem;
+  border-radius: 0.4rem;
   border: 1px solid #e5e5e5;
-  background: var(--color-surface-writing);
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(44 44 42 / 0.04),
+    0 0 0 1px rgb(255 255 255 / 0.8) inset;
   transition:
     border-color 220ms ease,
-    box-shadow 220ms ease,
-    background-color 220ms ease;
+    box-shadow 220ms ease;
 }
 
-.kweb-editor-shell[data-focused="true"] {
-  border-color: #d4d4d4;
-  box-shadow: 0 0 0 1px rgb(44 44 42 / 0.06);
+.kweb-editor-frame[data-focused="true"] .kweb-editor-shell {
+  border-color: #dedede;
+  box-shadow:
+    0 1px 3px rgb(44 44 42 / 0.06),
+    0 0 0 1px rgb(255 255 255 / 0.9) inset;
 }
 
 .kweb-editor-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
-  border-bottom: 1px solid #e5e5e5;
-  padding: 0.5rem;
+  border-bottom: 1px solid #efefef;
+  padding: 0.5rem 0.65rem;
+  background: #fafafa;
+  border-radius: 0.4rem 0.4rem 0 0;
   transition: opacity 220ms ease;
 }
 
-.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar {
+.kweb-editor-frame[data-focused="true"] .kweb-editor-toolbar {
   opacity: 0.55;
 }
 
-.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar:hover,
-.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar:focus-within {
+.kweb-editor-frame[data-focused="true"] .kweb-editor-toolbar:hover,
+.kweb-editor-frame[data-focused="true"] .kweb-editor-toolbar:focus-within {
   opacity: 1;
 }
 
@@ -78,10 +101,46 @@ html {
   margin-inline: auto;
   width: 100%;
   min-height: 22rem;
-  padding: 1.25rem 1.5rem 2.5rem;
+  padding: 1.35rem 1.6rem 2.75rem;
   outline: none;
+  background: #ffffff;
 }
 
+/*
+  Flow focus (iA Writer–style): while writing, only the current sentence
+  stays full ink. Other blocks soften. Characters appear instantly.
+*/
+.kweb-editor-frame[data-focused="true"] .kweb-editor :is(p, h2, h3, blockquote) {
+  transition:
+    opacity 280ms ease,
+    color 280ms ease;
+  opacity: 0.32;
+}
+
+.kweb-editor-frame[data-focused="true"] .kweb-editor .kweb-focus-block {
+  opacity: 1;
+  color: var(--color-ink-faint);
+}
+
+.kweb-editor-frame[data-focused="true"] .kweb-editor .kweb-focus-block:not(:has(.kweb-focus-sentence)),
+.kweb-editor-frame[data-focused="true"] .kweb-editor .kweb-focus-sentence {
+  color: var(--color-ink);
+}
+
+.kweb-editor-frame[data-focused="true"] .kweb-focus-sentence {
+  transition: color 180ms ease;
+}
+
+.kweb-editor-frame[data-focused="true"] .kweb-editor .kweb-editor-figure:not(.kweb-focus-block) {
+  opacity: 0.32;
+  transition: opacity 280ms ease;
+}
+
+.kweb-editor-frame[data-focused="true"] .kweb-editor .kweb-editor-figure.kweb-focus-block {
+  opacity: 1;
+}
+
+/* Keep selection readable on the white writing frame */
 .kweb-editor ::selection {
   background: var(--color-ink-selection);
   color: var(--color-ink);
@@ -166,13 +225,38 @@ html {
   font-style: italic;
 }
 
+.kweb-editor-figure {
+  display: block;
+  margin: 1.5rem auto;
+  max-width: min(100%, 36rem);
+  text-align: center;
+}
+
+.kweb-editor-figure.is-selected .kweb-editor-image {
+  box-shadow:
+    0 0 0 1px rgb(44 44 42 / 0.18),
+    0 1px 2px rgb(44 44 42 / 0.04);
+}
+
+.kweb-editor-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-inline: auto;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(44 44 42 / 0.04);
+  object-fit: contain;
+}
+
 /* Title / description on topic page */
 .kweb-topic-title {
   font-family: var(--font-sans);
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  font-size: 2.35rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
   color: var(--color-ink);
   caret-color: var(--color-ink-caret);
 }

@@ -280,6 +280,23 @@ pub async fn vault_write(root: String, relative: String, text: String) -> Result
 }
 
 #[tauri::command]
+pub async fn vault_write_bytes(
+    root: String,
+    relative: String,
+    base64: String,
+) -> Result<(), String> {
+    run_blocking(move || {
+        use base64::Engine as _;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(base64.as_bytes())
+            .map_err(|e| e.to_string())?;
+        let target = resolve(&root, &relative)?;
+        atomic_write(&target, &bytes)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn vault_mkdir(root: String, relative: String) -> Result<(), String> {
     run_blocking(move || {
         let target = resolve(&root, &relative)?;

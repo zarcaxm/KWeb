@@ -39,6 +39,54 @@ export function writeVaultText(
   return invoke("vault_write", { root, relative, text });
 }
 
+export function writeVaultBytes(
+  root: string,
+  relative: string,
+  data: Uint8Array
+): Promise<void> {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < data.length; i += chunk) {
+    binary += String.fromCharCode(...data.subarray(i, i + chunk));
+  }
+  const base64 = btoa(binary);
+  return invoke("vault_write_bytes", { root, relative, base64 });
+}
+
+export function joinVaultPath(root: string, relative: string): string {
+  const cleanRoot = root.replace(/[/\\]+$/, "");
+  const cleanRel = relative.replace(/^[/\\]+/, "").replace(/\\/g, "/");
+  return `${cleanRoot}/${cleanRel}`;
+}
+
+/** Resolve a vault-relative media path (or pass-through URL) for <img src>. */
+export async function resolveVaultMediaSrc(src: string): Promise<string> {
+  if (
+    !src ||
+    src.startsWith("data:") ||
+    src.startsWith("blob:") ||
+    src.startsWith("http://") ||
+    src.startsWith("https://") ||
+    src.startsWith("asset:") ||
+    src.startsWith("asset://")
+  ) {
+    return src;
+  }
+  if (!isDesktopApp()) return src;
+  try {
+    const { convertFileSrc } = await import("@tauri-apps/api/core");
+    const { currentVaultPath } = await import("@/lib/vault/engine");
+    const root = currentVaultPath();
+    if (!root) return src;
+    const absolute = src.startsWith("/") || /^[A-Za-z]:[\\/]/.test(src)
+      ? src
+      : joinVaultPath(root, src);
+    return convertFileSrc(absolute);
+  } catch {
+    return src;
+  }
+}
+
 export function makeVaultDir(root: string, relative: string): Promise<void> {
   return invoke("vault_mkdir", { root, relative });
 }

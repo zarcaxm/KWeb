@@ -3,7 +3,7 @@ mod vault;
 use vault::{
     get_last_vault, get_local_topic_opens, pick_directory, record_local_topic_open, set_last_vault,
     vault_load, vault_mkdir, vault_remove_dir, vault_remove_file, vault_rename, vault_start_watch,
-    vault_stop_watch, vault_write,
+    vault_stop_watch, vault_write, vault_write_bytes,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -28,6 +28,7 @@ pub fn run() {
             pick_directory,
             vault_load,
             vault_write,
+            vault_write_bytes,
             vault_mkdir,
             vault_rename,
             vault_remove_file,

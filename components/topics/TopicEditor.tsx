@@ -1,12 +1,18 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import { useEffect, useRef, useState } from "react";
 import { Bold, Heading2, List, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { VaultImage } from "@/components/topics/VaultImage";
+import { FocusFlow } from "@/lib/editor/focusFlow";
+import {
+  imageFilesFromDataTransfer,
+  persistEditorImage,
+} from "@/lib/editor/persistImage";
 
 interface TopicEditorProps {
   content: string;
@@ -14,10 +20,21 @@ interface TopicEditorProps {
   onFocusChange?: (focused: boolean) => void;
 }
 
-function getMarkdown(editor: ReturnType<typeof useEditor>): string {
+function getMarkdown(editor: Editor | null): string {
   if (!editor) return "";
   const storage = editor.storage as { markdown?: { getMarkdown: () => string } };
   return storage.markdown?.getMarkdown() ?? editor.getText();
+}
+
+async function insertImageFiles(editor: Editor, files: File[]) {
+  for (const file of files) {
+    try {
+      const src = await persistEditorImage(file);
+      editor.chain().focus().setImage({ src, alt: file.name }).run();
+    } catch (err) {
+      console.warn("Could not insert image", err);
+    }
+  }
 }
 
 export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorProps) {
@@ -26,6 +43,7 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
   const pendingMd = useRef<string | null>(null);
   const onChangeRef = useRef(onChange);
   const onFocusChangeRef = useRef(onFocusChange);
+  const editorRef = useRef<Editor | null>(null);
   onChangeRef.current = onChange;
   onFocusChangeRef.current = onFocusChange;
   const [focused, setFocused] = useState(false);
@@ -56,7 +74,6 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
       onFocusChangeRef.current?.(true);
       return;
     }
-    // Delay blur so toolbar clicks don't flash focus mode off
     blurTimer.current = setTimeout(() => {
       blurTimer.current = null;
       setFocused(false);
@@ -73,6 +90,8 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
         placeholder: "Start writing…",
         emptyEditorClass: "is-editor-empty",
       }),
+      VaultImage,
+      FocusFlow,
       Markdown.configure({
         html: false,
         transformPastedText: true,
@@ -85,9 +104,24 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
         class: "kweb-editor prose max-w-none focus:outline-none",
         "aria-label": "Topic content",
       },
-      // Keep the caret in a comfortable vertical band while typing.
       scrollThreshold: { top: 96, bottom: 140, left: 24, right: 24 },
       scrollMargin: { top: 140, bottom: 180, left: 0, right: 0 },
+      handlePaste: (_view, event) => {
+        const files = imageFilesFromDataTransfer(event.clipboardData);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const ed = editorRef.current;
+        if (ed) void insertImageFiles(ed, files);
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        const files = imageFilesFromDataTransfer(event.dataTransfer);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const ed = editorRef.current;
+        if (ed) void insertImageFiles(ed, files);
+        return true;
+      },
     },
     onFocus: () => setWritingFocus(true),
     onBlur: () => setWritingFocus(false),
@@ -110,6 +144,8 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
     },
   });
 
+  editorRef.current = editor;
+
   useEffect(() => {
     return () => {
       flushPending();
@@ -123,51 +159,53 @@ export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorPro
   }
 
   return (
-    <div className="kweb-editor-shell" data-focused={focused ? "true" : "false"}>
-      <div
-        className="kweb-editor-toolbar"
-        role="toolbar"
-        aria-label="Formatting"
-        onMouseDown={() => setWritingFocus(true)}
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-[36px] min-w-[36px] p-2"
-          aria-label="Heading"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+    <div className="kweb-editor-frame" data-focused={focused ? "true" : "false"}>
+      <div className="kweb-editor-shell">
+        <div
+          className="kweb-editor-toolbar"
+          role="toolbar"
+          aria-label="Formatting"
+          onMouseDown={() => setWritingFocus(true)}
         >
-          <Heading2 className="h-4 w-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-[36px] min-w-[36px] p-2"
-          aria-label="Bold"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <Bold className="h-4 w-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-[36px] min-w-[36px] p-2"
-          aria-label="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          <List className="h-4 w-4" aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-[36px] min-w-[36px] p-2"
-          aria-label="Ordered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          <ListOrdered className="h-4 w-4" aria-hidden />
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-[36px] min-w-[36px] p-2"
+            aria-label="Heading"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          >
+            <Heading2 className="h-4 w-4" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-[36px] min-w-[36px] p-2"
+            aria-label="Bold"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+          >
+            <Bold className="h-4 w-4" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-[36px] min-w-[36px] p-2"
+            aria-label="Bullet list"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+          >
+            <List className="h-4 w-4" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-[36px] min-w-[36px] p-2"
+            aria-label="Ordered list"
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          >
+            <ListOrdered className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+        <EditorContent editor={editor} />
       </div>
-      <EditorContent editor={editor} />
     </div>
   );
 }
