@@ -29,6 +29,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
   const { refresh } = useDb();
   const { expand } = useExpandedFoldersContext();
   const [addConnectionOpen, setAddConnectionOpen] = useState(false);
+  const [connectionMode, setConnectionMode] = useState<"link" | "create">("link");
   const [moveOpen, setMoveOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -313,7 +314,14 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
 
       <RelatedTopics
         connections={connections ?? []}
-        onAdd={() => setAddConnectionOpen(true)}
+        onAdd={() => {
+          setConnectionMode("link");
+          setAddConnectionOpen(true);
+        }}
+        onCreate={() => {
+          setConnectionMode("create");
+          setAddConnectionOpen(true);
+        }}
       />
 
       <AddConnectionDialog
@@ -321,6 +329,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
         onClose={() => setAddConnectionOpen(false)}
         sourceTopic={topic}
         linkedTopicIds={linkedIds}
+        initialMode={connectionMode}
       />
       <MoveTopicDialog
         open={moveOpen}

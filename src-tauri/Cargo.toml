@@ -1,6 +1,6 @@
 [package]
 name = "kweb"
-version = "0.1.4"
+version = "0.1.5"
 description = "KWeb knowledge workspace"
 authors = ["KWeb"]
 license = ""

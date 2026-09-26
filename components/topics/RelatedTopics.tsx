@@ -11,6 +11,7 @@ import { RELATIONSHIP_LABELS } from "@/types/models";
 interface RelatedTopicsProps {
   connections: TopicConnectionView[];
   onAdd: () => void;
+  onCreate: () => void;
 }
 
 function relationshipLabel(view: TopicConnectionView): string | null {
@@ -21,7 +22,7 @@ function relationshipLabel(view: TopicConnectionView): string | null {
   return RELATIONSHIP_LABELS[type];
 }
 
-export function RelatedTopics({ connections, onAdd }: RelatedTopicsProps) {
+export function RelatedTopics({ connections, onAdd, onCreate }: RelatedTopicsProps) {
   const { refresh } = useDb();
 
   const handleRemove = async (connectionId: string) => {
@@ -31,18 +32,23 @@ export function RelatedTopics({ connections, onAdd }: RelatedTopicsProps) {
 
   return (
     <section className="mt-10 border-t border-neutral-200 pt-8" aria-labelledby="related-heading">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="related-heading" className="text-sm font-medium text-neutral-500">
           Related topics
         </h2>
-        <Button variant="ghost" className="text-sm" onClick={onAdd}>
-          <Plus className="h-4 w-4" aria-hidden />
-          Add related topic
-        </Button>
+        <div className="flex flex-wrap gap-1">
+          <Button variant="ghost" className="text-sm" onClick={onCreate}>
+            <Plus className="h-4 w-4" aria-hidden />
+            Create related
+          </Button>
+          <Button variant="ghost" className="text-sm" onClick={onAdd}>
+            Link existing
+          </Button>
+        </div>
       </div>
       {connections.length === 0 ? (
         <p className="mt-3 text-sm text-neutral-500">
-          No connections yet. Link topics that provide useful context.
+          No connections yet. Create a related topic or link one that already exists.
         </p>
       ) : (
         <ul className="mt-4 flex flex-wrap gap-2">
