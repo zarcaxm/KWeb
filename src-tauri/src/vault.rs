@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tauri::async_runtime;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,10 +23,14 @@ struct Settings {
 }
 
 fn settings_dir() -> PathBuf {
-    let base = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".into());
-    PathBuf::from(base).join("KWeb")
+    if let Ok(base) = std::env::var("APPDATA") {
+        return PathBuf::from(base).join("KWeb");
+    }
+    if let Ok(base) = std::env::var("XDG_CONFIG_HOME") {
+        return PathBuf::from(base).join("KWeb");
+    }
+    let base = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    PathBuf::from(base).join(".config").join("KWeb")
 }
 
 fn settings_file() -> PathBuf {
@@ -43,6 +48,16 @@ fn write_settings(settings: &Settings) -> Result<(), String> {
     fs::create_dir_all(settings_dir()).map_err(|e| e.to_string())?;
     let text = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(settings_file(), text).map_err(|e| e.to_string())
+}
+
+async fn run_blocking<T, F>(task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn canonicalize_dir(path: &Path) -> Result<PathBuf, String> {
@@ -107,7 +122,7 @@ fn walk(dir: &Path, root: &Path, snapshot: &mut VaultSnapshot) -> Result<(), Str
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        if name == ".git" {
+        if should_skip_dir(&name) {
             continue;
         }
         let meta = entry.metadata().map_err(|e| e.to_string())?;
@@ -130,88 +145,132 @@ fn walk(dir: &Path, root: &Path, snapshot: &mut VaultSnapshot) -> Result<(), Str
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_last_vault() -> Option<String> {
-    read_settings().vault_path
+fn should_skip_dir(name: &str) -> bool {
+    matches!(
+        name,
+        ".git"
+            | ".hg"
+            | ".svn"
+            | ".next"
+            | ".nuxt"
+            | ".svelte-kit"
+            | ".turbo"
+            | ".cache"
+            | "node_modules"
+            | "target"
+            | "dist"
+            | "build"
+            | "coverage"
+            | "out"
+    )
 }
 
 #[tauri::command]
-pub fn set_last_vault(path: String) -> Result<(), String> {
-    let mut settings = read_settings();
-    settings.vault_path = Some(path);
-    write_settings(&settings)
+pub async fn get_last_vault() -> Result<Option<String>, String> {
+    run_blocking(|| Ok(read_settings().vault_path)).await
 }
 
 #[tauri::command]
-pub fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+pub async fn set_last_vault(path: String) -> Result<(), String> {
+    run_blocking(move || {
+        let mut settings = read_settings();
+        settings.vault_path = Some(path);
+        write_settings(&settings)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
-    let picked = app
-        .dialog()
-        .file()
-        .set_title("Choose a vault folder")
-        .blocking_pick_folder();
-    match picked {
-        None => Ok(None),
-        Some(file) => {
-            let path = file.into_path().map_err(|err| err.to_string())?;
-            Ok(Some(path.to_string_lossy().to_string()))
+    run_blocking(move || {
+        let picked = app
+            .dialog()
+            .file()
+            .set_title("Choose a vault folder")
+            .blocking_pick_folder();
+        match picked {
+            None => Ok(None),
+            Some(file) => {
+                let path = file.into_path().map_err(|err| err.to_string())?;
+                Ok(Some(path.to_string_lossy().to_string()))
+            }
         }
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_load(root: String) -> Result<VaultSnapshot, String> {
-    let root_path = canonicalize_dir(Path::new(&root))?;
-    let mut snapshot = VaultSnapshot {
-        files: Vec::new(),
-        directories: Vec::new(),
-    };
-    walk(&root_path, &root_path, &mut snapshot)?;
-    snapshot.directories.sort();
-    snapshot.files.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(snapshot)
+pub async fn vault_load(root: String) -> Result<VaultSnapshot, String> {
+    run_blocking(move || {
+        let root_path = canonicalize_dir(Path::new(&root))?;
+        let mut snapshot = VaultSnapshot {
+            files: Vec::new(),
+            directories: Vec::new(),
+        };
+        walk(&root_path, &root_path, &mut snapshot)?;
+        snapshot.directories.sort();
+        snapshot.files.sort_by(|a, b| a.path.cmp(&b.path));
+        Ok(snapshot)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_write(root: String, relative: String, text: String) -> Result<(), String> {
-    let target = resolve(&root, &relative)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    fs::write(target, text).map_err(|e| e.to_string())
+pub async fn vault_write(root: String, relative: String, text: String) -> Result<(), String> {
+    run_blocking(move || {
+        let target = resolve(&root, &relative)?;
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(target, text).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_mkdir(root: String, relative: String) -> Result<(), String> {
-    let target = resolve(&root, &relative)?;
-    fs::create_dir_all(target).map_err(|e| e.to_string())
+pub async fn vault_mkdir(root: String, relative: String) -> Result<(), String> {
+    run_blocking(move || {
+        let target = resolve(&root, &relative)?;
+        fs::create_dir_all(target).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_rename(root: String, from: String, to: String) -> Result<(), String> {
-    let source = resolve(&root, &from)?;
-    let dest = resolve(&root, &to)?;
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    fs::rename(source, dest).map_err(|e| e.to_string())
+pub async fn vault_rename(root: String, from: String, to: String) -> Result<(), String> {
+    run_blocking(move || {
+        let source = resolve(&root, &from)?;
+        let dest = resolve(&root, &to)?;
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::rename(source, dest).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_remove_file(root: String, relative: String) -> Result<(), String> {
-    let target = resolve(&root, &relative)?;
-    if target.is_file() {
-        fs::remove_file(target).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+pub async fn vault_remove_file(root: String, relative: String) -> Result<(), String> {
+    run_blocking(move || {
+        let target = resolve(&root, &relative)?;
+        if target.is_file() {
+            fs::remove_file(target).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn vault_remove_dir(root: String, relative: String) -> Result<(), String> {
-    let root_canon = canonicalize_dir(Path::new(&root))?;
-    let target = resolve(&root, &relative)?;
-    if target == root_canon {
-        return Err("Cannot remove the vault root".into());
-    }
-    fs::remove_dir(target).map_err(|e| e.to_string())
+pub async fn vault_remove_dir(root: String, relative: String) -> Result<(), String> {
+    run_blocking(move || {
+        let root_canon = canonicalize_dir(Path::new(&root))?;
+        let target = resolve(&root, &relative)?;
+        if target == root_canon {
+            return Err("Cannot remove the vault root".into());
+        }
+        fs::remove_dir(target).map_err(|e| e.to_string())
+    })
+    .await
 }

@@ -18,13 +18,14 @@ My Vault/
 - A topic can relate to topics in other folders. The folder path and the connection are independent.
 - A later cloud sync can synchronize this folder. Each topic file can sync on its own.
 
-The last opened vault path is remembered in `%APPDATA%\KWeb\settings.json` (or your home directory). That file is app settings, not your knowledge.
+The last opened vault path is remembered in `%APPDATA%\KWeb\settings.json` on Windows or `${XDG_CONFIG_HOME:-~/.config}/KWeb/settings.json` on Linux. That file is app settings, not your knowledge.
 
 ## Requirements
 
 - Node.js 18+
-- Rust (https://rustup.rs) and the Microsoft C++ build tools, for the desktop shell
-- WebView2 (already present on current Windows 10/11)
+- Rust (https://rustup.rs)
+- Windows: Microsoft C++ build tools and WebView2 (already present on current Windows 10/11)
+- Linux: WebKitGTK 4.1 and GTK 3 development packages, plus the normal Tauri Linux prerequisites
 
 ## Desktop app
 
@@ -53,7 +54,25 @@ npm run desktop:build
 
 The installer is written under `src-tauri/target/release/bundle`.
 
-The build signs the update package with the private key at `%USERPROFILE%\.tauri\kweb.key` (password `kweb`). That key stays on this machine. It is not in the repository. If the file is missing, the release build cannot produce an installable update.
+Updater artifacts are signed when `TAURI_SIGNING_PRIVATE_KEY` or `TAURI_SIGNING_PRIVATE_KEY_PATH` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are present in the build environment. The private key stays outside this repository.
+
+### Linux
+
+Build the native Linux release binary with:
+
+```bash
+npm run desktop:build:linux
+```
+
+Install it for the current user with:
+
+```bash
+npm run install:linux
+```
+
+The installer copies KWeb into `~/.local/bin` and creates a desktop entry whose `Exec` value is the absolute installed path. This is intentional: graphical launchers do not always inherit a shell `PATH` containing `~/.local/bin`. An alternate prefix or binary can be supplied with `--prefix` and `--binary`.
+
+Build distributable AppImages on an older-glibc Linux CI image. Tauri's bundled `linuxdeploy` symbol-stripper cannot process the RELR sections in current Arch Linux system libraries, so AppImage packaging on current Arch fails even though the application binary builds successfully.
 
 ## Updates
 
@@ -65,7 +84,7 @@ To publish a version:
 
 1. Raise `version` in `package.json` and `src-tauri/tauri.conf.json` to the same value.
 2. Run `npm run desktop:build`.
-3. Create a GitHub release and upload `latest.json` plus the Windows setup `.exe` from `src-tauri/target/release/bundle/nsis`. The app downloads `latest.json` from that release.
+3. Create a GitHub release and upload `latest.json` plus each supported platform's installer and signed updater artifacts. Windows output is under `src-tauri/target/release/bundle/nsis`; Linux AppImage output is under `src-tauri/target/release/bundle/appimage`. The app downloads `latest.json` from that release.
 
 ## Keyboard
 

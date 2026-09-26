@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "desktop": "set \"PATH=%USERPROFILE%\\.cargo\\bin;%PATH%\" && tauri dev",
-    "desktop:build": "set \"PATH=%USERPROFILE%\\.cargo\\bin;%PATH%\" && set \"TAURI_SIGNING_PRIVATE_KEY_PATH=%USERPROFILE%\\.tauri\\kweb.key\" && set TAURI_SIGNING_PRIVATE_KEY_PASSWORD=kweb && tauri build"
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:build:linux": "tauri build --no-bundle",
+    "install:linux": "bash scripts/install-linux.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
