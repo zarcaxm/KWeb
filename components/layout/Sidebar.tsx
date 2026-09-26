@@ -15,6 +15,7 @@ import {
   getFavoriteTopics,
   getRecentTopics,
 } from "@/lib/repositories/topicRepository";
+import { APP_VERSION } from "@/lib/version";
 
 interface SidebarProps {
   open: boolean;
@@ -54,9 +55,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
         <Link
           href="/"
-          className="text-lg font-semibold tracking-tight text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+          className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
         >
-          KWeb
+          <span className="block text-lg font-semibold tracking-tight text-neutral-900">
+            KWeb
+          </span>
+          <span className="block text-xs text-neutral-500">v{APP_VERSION}</span>
         </Link>
         <Button
           variant="ghost"

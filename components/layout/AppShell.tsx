@@ -7,6 +7,7 @@ import { ExpandedFoldersProvider } from "@/components/folders/ExpandedFoldersCon
 import { DbGate } from "@/components/layout/DbGate";
 import { Button } from "@/components/ui/Button";
 import { UpdateBanner } from "@/components/layout/UpdateBanner";
+import { APP_VERSION } from "@/lib/version";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -63,7 +64,10 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Menu className="h-5 w-5" aria-hidden />
             </Button>
-            <span className="text-base font-semibold tracking-tight">KWeb</span>
+            <div className="min-w-0">
+              <span className="block text-base font-semibold tracking-tight">KWeb</span>
+              <span className="block text-xs text-neutral-500">v{APP_VERSION}</span>
+            </div>
           </header>
 
           <UpdateBanner />

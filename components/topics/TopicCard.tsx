@@ -22,15 +22,17 @@ export function TopicCard({
     return (
       <Link
         href={`/topic?id=${topic.id}`}
-        className="flex flex-col gap-1 py-4 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-neutral-900 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-1.5 py-4 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-neutral-900"
       >
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-neutral-900">{topic.title}</h3>
+          <h3 className="break-words text-base font-semibold text-neutral-900">
+            {topic.title}
+          </h3>
           {topic.description ? (
             <p className="mt-0.5 truncate text-sm text-neutral-600">{topic.description}</p>
           ) : null}
         </div>
-        <div className="flex shrink-0 gap-4 text-sm text-neutral-500">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-500">
           <span>{relatedLabel}</span>
           <span>Updated {formatRelativeTime(topic.updatedAt)}</span>
         </div>
@@ -43,7 +45,7 @@ export function TopicCard({
       href={`/topic?id=${topic.id}`}
       className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 hover:border-neutral-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
     >
-      <h3 className="text-lg font-semibold text-neutral-900">{topic.title}</h3>
+      <h3 className="break-words text-lg font-semibold text-neutral-900">{topic.title}</h3>
       {topic.description ? (
         <p className="mt-2 line-clamp-2 text-sm text-neutral-600">{topic.description}</p>
       ) : (
