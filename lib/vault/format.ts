@@ -63,6 +63,8 @@ export function serializeTopicFile(meta: TopicFileMeta, content: string): string
 export function parseTopicFile(raw: string): {
   meta: Partial<TopicFileMeta>;
   content: string;
+  /** False when the frontmatter fence exists but JSON is invalid. */
+  metaOk: boolean;
 } | null {
   if (!raw.startsWith("---")) return null;
   const start = raw.indexOf("\n");
@@ -70,14 +72,16 @@ export function parseTopicFile(raw: string): {
   const end = raw.indexOf("\n---", start);
   if (end < 0) return null;
   const jsonText = raw.slice(start + 1, end).trim();
+  let content = raw.slice(end + 4);
+  if (content.startsWith("\n")) content = content.slice(1);
+  if (content.startsWith("\n")) content = content.slice(1);
   try {
     const meta = JSON.parse(jsonText) as Partial<TopicFileMeta>;
-    let content = raw.slice(end + 4);
-    if (content.startsWith("\n")) content = content.slice(1);
-    if (content.startsWith("\n")) content = content.slice(1);
-    return { meta, content };
+    return { meta, content, metaOk: true };
   } catch {
-    return null;
+    // Keep the body; do not treat the whole file as content (avoids nesting
+    // another frontmatter block on the next vault open rewrite).
+    return { meta: {}, content, metaOk: false };
   }
 }
 

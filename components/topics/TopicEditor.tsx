@@ -21,6 +21,24 @@ function getMarkdown(editor: ReturnType<typeof useEditor>): string {
 export function TopicEditor({ content, onChange }: TopicEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEmitted = useRef(content);
+  const pendingMd = useRef<string | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const flushPending = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const md = pendingMd.current;
+    if (md == null || md === lastEmitted.current) {
+      pendingMd.current = null;
+      return;
+    }
+    pendingMd.current = null;
+    lastEmitted.current = md;
+    onChangeRef.current(md);
+  };
 
   const editor = useEditor({
     extensions: [
@@ -43,28 +61,31 @@ export function TopicEditor({ content, onChange }: TopicEditorProps) {
     },
     onUpdate: ({ editor: ed }) => {
       const md = getMarkdown(ed);
-      if (md === lastEmitted.current) return;
+      if (md === lastEmitted.current) {
+        pendingMd.current = null;
+        return;
+      }
+      pendingMd.current = md;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        lastEmitted.current = md;
-        onChange(md);
+        debounceRef.current = null;
+        const next = pendingMd.current;
+        if (next == null || next === lastEmitted.current) return;
+        pendingMd.current = null;
+        lastEmitted.current = next;
+        onChangeRef.current(next);
       }, 400);
     },
   });
 
-  useEffect(() => {
-    if (!editor) return;
-    const current = getMarkdown(editor);
-    if (content !== current && content !== lastEmitted.current) {
-      editor.commands.setContent(content);
-      lastEmitted.current = content;
-    }
-  }, [content, editor]);
+  // content is initial-only; parent remounts this editor per topic via key={topicId}
+  // so vault refreshes cannot clobber in-progress edits.
 
   useEffect(() => {
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      flushPending();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!editor) {

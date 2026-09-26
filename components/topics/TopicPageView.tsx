@@ -33,18 +33,26 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Read-only load: recording "opened" separately avoids rewriting the topic
+  // file on every refresh, which raced with debounced content saves.
   const { data: topic, loading } = useAsyncData(
-    () => getTopic(topicId, { recordOpen: true }),
+    () => getTopic(topicId),
     [topicId]
   );
 
   const openedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (topic && openedRef.current !== topicId) {
-      openedRef.current = topicId;
-      refresh();
-    }
-  }, [topic, topicId, refresh]);
+    if (openedRef.current === topicId) return;
+    openedRef.current = topicId;
+    let cancelled = false;
+    (async () => {
+      await getTopic(topicId, { recordOpen: true });
+      if (!cancelled) refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId, refresh]);
 
   const { data: path } = useAsyncData(
     () => (topic ? getFolderPath(topic.folderId) : Promise.resolve([])),
@@ -64,6 +72,13 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const descRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef(title);
+  const descriptionRef = useRef(description);
+  titleRef.current = title;
+  descriptionRef.current = description;
+
+  const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const descDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (topic) {
@@ -91,38 +106,66 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
 
   const saveField = useCallback(
     async (
+      id: string,
       updates: Parameters<typeof updateTopic>[1],
       options?: { refreshUi?: boolean }
     ) => {
-      if (!topic) return;
-      await updateTopic(topic.id, updates);
+      await updateTopic(id, updates);
       if (options?.refreshUi) refresh();
     },
-    [topic, refresh]
+    [refresh]
   );
 
-  const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const descDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushTitleDesc = useCallback(
+    (id: string) => {
+      const pendingTitle = titleDebounce.current != null;
+      const pendingDesc = descDebounce.current != null;
+      if (titleDebounce.current) {
+        clearTimeout(titleDebounce.current);
+        titleDebounce.current = null;
+      }
+      if (descDebounce.current) {
+        clearTimeout(descDebounce.current);
+        descDebounce.current = null;
+      }
+      if (!pendingTitle && !pendingDesc) return;
+      const updates: Parameters<typeof updateTopic>[1] = {};
+      if (pendingTitle) updates.title = titleRef.current;
+      if (pendingDesc) updates.description = descriptionRef.current;
+      void saveField(id, updates, { refreshUi: true });
+    },
+    [saveField]
+  );
+
+  useEffect(() => {
+    return () => {
+      flushTitleDesc(topicId);
+    };
+  }, [topicId, flushTitleDesc]);
 
   const handleTitleChange = (value: string) => {
-    if (!topic) return;
     if (titleDebounce.current) clearTimeout(titleDebounce.current);
     titleDebounce.current = setTimeout(() => {
-      saveField({ title: value });
+      titleDebounce.current = null;
+      void saveField(topicId, { title: value }, { refreshUi: true });
     }, 400);
   };
 
   const handleDescriptionChange = (value: string) => {
-    if (!topic) return;
     if (descDebounce.current) clearTimeout(descDebounce.current);
     descDebounce.current = setTimeout(() => {
-      saveField({ description: value });
+      descDebounce.current = null;
+      void saveField(topicId, { description: value }, { refreshUi: true });
     }, 400);
   };
 
   const toggleFavorite = async () => {
     if (!topic) return;
-    await saveField({ isFavorite: !topic.isFavorite }, { refreshUi: true });
+    await saveField(
+      topicId,
+      { isFavorite: !topic.isFavorite },
+      { refreshUi: true }
+    );
   };
 
   const handleDelete = async () => {
@@ -172,7 +215,13 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
               setTitle(e.target.value);
               handleTitleChange(e.target.value);
             }}
-            onBlur={(e) => saveField({ title: e.target.value })}
+            onBlur={(e) => {
+              if (titleDebounce.current) {
+                clearTimeout(titleDebounce.current);
+                titleDebounce.current = null;
+              }
+              void saveField(topicId, { title: e.target.value }, { refreshUi: true });
+            }}
             aria-label="Topic title"
           />
           <textarea
@@ -185,7 +234,13 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
               setDescription(e.target.value);
               handleDescriptionChange(e.target.value);
             }}
-            onBlur={(e) => saveField({ description: e.target.value })}
+            onBlur={(e) => {
+              if (descDebounce.current) {
+                clearTimeout(descDebounce.current);
+                descDebounce.current = null;
+              }
+              void saveField(topicId, { description: e.target.value }, { refreshUi: true });
+            }}
             aria-label="Topic description"
           />
         </div>
@@ -249,8 +304,11 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
       <div className="my-8 border-t border-neutral-200" role="separator" />
 
       <TopicEditor
+        key={topicId}
         content={topic.content}
-        onChange={(md) => saveField({ content: md })}
+        onChange={(md) => {
+          void saveField(topicId, { content: md });
+        }}
       />
 
       <RelatedTopics

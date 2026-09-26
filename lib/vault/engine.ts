@@ -253,11 +253,14 @@ function buildIndex(root: string, snapshot: VaultSnapshot): {
     const parsed = parseTopicFile(file.text);
     const stem = baseName(file.path).replace(/\.md$/i, "");
     const meta = parsed?.meta ?? {};
+    const metaOk = parsed?.metaOk === true;
     let id = meta.id || createId();
-    let needsWrite = !parsed || !meta.id;
+    // Only auto-heal files with valid frontmatter. Corrupt/missing fences are
+    // left on disk as-is so open never nests a new --- wrapper around them.
+    let needsWrite = metaOk && !meta.id;
     if (usedIds.has(id)) {
       id = createId();
-      needsWrite = true;
+      needsWrite = metaOk;
     }
     usedIds.add(id);
 
