@@ -6,6 +6,7 @@ import { Markdown } from "tiptap-markdown";
 import { useEffect, useRef } from "react";
 import { Bold, Heading2, List, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { TypingAnimation } from "@/lib/editor/typingAnimation";
 
 interface TopicEditorProps {
   content: string;
@@ -50,12 +51,13 @@ export function TopicEditor({ content, onChange }: TopicEditorProps) {
         transformPastedText: true,
         transformCopiedText: true,
       }),
+      TypingAnimation,
     ],
     content,
     editorProps: {
       attributes: {
         class:
-          "prose prose-neutral max-w-none min-h-[320px] px-4 py-3 focus:outline-none text-neutral-800",
+          "prose prose-neutral max-w-none min-h-[320px] px-4 py-3 focus:outline-none text-neutral-800 kweb-editor",
         "aria-label": "Topic content",
       },
     },

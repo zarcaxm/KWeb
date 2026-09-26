@@ -54,3 +54,27 @@ html {
   padding: 0.1em 0.3em;
   border-radius: 0.25rem;
 }
+
+/* Soft character fade-in while typing in the topic editor */
+@keyframes kweb-type-in {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.kweb-editor {
+  caret-color: #171717;
+}
+
+.kweb-editor .kweb-typed {
+  animation: kweb-type-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kweb-editor .kweb-typed {
+    animation: none;
+  }
+}
