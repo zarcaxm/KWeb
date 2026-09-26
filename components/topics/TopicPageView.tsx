@@ -63,6 +63,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (topic) {
@@ -72,6 +73,13 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
     // Only re-sync when navigating to a different topic
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic?.id]);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   useEffect(() => {
     if (topic?.folderId) {
@@ -167,8 +175,10 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
             onBlur={(e) => saveField({ title: e.target.value })}
             aria-label="Topic title"
           />
-          <input
-            className="w-full border-0 bg-transparent p-0 text-sm text-neutral-600 placeholder:text-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
+          <textarea
+            ref={descRef}
+            rows={1}
+            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm text-neutral-600 placeholder:text-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
             placeholder="Short description"
             value={description}
             onChange={(e) => {
