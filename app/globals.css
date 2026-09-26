@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, sans-serif, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    "Noto Sans", sans-serif;
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif, "Segoe UI",
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-writing: var(--font-literata), "Literata", Georgia, "Times New Roman", serif;
+
+  /* Writing ink — warm charcoal, not pure black */
+  --color-ink: #2c2c2a;
+  --color-ink-secondary: #5e5e5a;
+  --color-ink-faint: #8f8f89;
+  --color-ink-caret: #3a3a36;
+  --color-ink-selection: rgb(44 44 42 / 0.14);
+  --color-surface-writing: #fffcf8;
 }
 
 html {
@@ -20,6 +29,196 @@ html {
   }
 }
 
+/* —— Writing surface —— */
+
+.kweb-editor-shell {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e5e5;
+  background: var(--color-surface-writing);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background-color 220ms ease;
+}
+
+.kweb-editor-shell[data-focused="true"] {
+  border-color: #d4d4d4;
+  box-shadow: 0 0 0 1px rgb(44 44 42 / 0.06);
+}
+
+.kweb-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 0.5rem;
+  transition: opacity 220ms ease;
+}
+
+.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar {
+  opacity: 0.55;
+}
+
+.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar:hover,
+.kweb-editor-shell[data-focused="true"] .kweb-editor-toolbar:focus-within {
+  opacity: 1;
+}
+
+.kweb-editor {
+  font-family: var(--font-writing);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: 0.005em;
+  color: var(--color-ink);
+  caret-color: var(--color-ink-caret);
+  max-width: 42rem;
+  margin-inline: auto;
+  width: 100%;
+  min-height: 22rem;
+  padding: 1.25rem 1.5rem 2.5rem;
+  outline: none;
+}
+
+.kweb-editor ::selection {
+  background: var(--color-ink-selection);
+  color: var(--color-ink);
+}
+
+.kweb-editor .ProseMirror-selectednode {
+  outline: 1px solid rgb(44 44 42 / 0.2);
+}
+
+/* Keep the caret in a comfortable band while typing */
+.kweb-editor.ProseMirror,
+.kweb-editor .ProseMirror {
+  scroll-margin-top: 28vh;
+  scroll-margin-bottom: 32vh;
+}
+
+.kweb-editor p {
+  margin: 0.85em 0;
+}
+
+.kweb-editor p + p {
+  margin-top: 0.95em;
+}
+
+.kweb-editor h2 {
+  font-family: var(--font-writing);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  margin-top: 1.6em;
+  margin-bottom: 0.55em;
+  line-height: 1.35;
+}
+
+.kweb-editor h3 {
+  font-family: var(--font-writing);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-top: 1.35em;
+  margin-bottom: 0.45em;
+  line-height: 1.4;
+}
+
+.kweb-editor ul,
+.kweb-editor ol {
+  padding-left: 1.35rem;
+  margin: 0.75em 0;
+}
+
+.kweb-editor li {
+  margin: 0.35em 0;
+}
+
+.kweb-editor li + li {
+  margin-top: 0.4em;
+}
+
+.kweb-editor code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  background: #f3f1ed;
+  color: var(--color-ink);
+  padding: 0.12em 0.35em;
+  border-radius: 0.25rem;
+}
+
+.kweb-editor blockquote {
+  border-left: 2px solid #d6d3ce;
+  margin: 1em 0;
+  padding-left: 1rem;
+  color: var(--color-ink-secondary);
+}
+
+.kweb-editor p.is-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-ink-faint);
+  font-style: italic;
+}
+
+/* Title / description on topic page */
+.kweb-topic-title {
+  font-family: var(--font-sans);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--color-ink);
+  caret-color: var(--color-ink-caret);
+}
+
+.kweb-topic-title::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.kweb-topic-title::selection {
+  background: var(--color-ink-selection);
+}
+
+.kweb-topic-description {
+  font-family: var(--font-writing);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  color: var(--color-ink-secondary);
+  caret-color: var(--color-ink-caret);
+}
+
+.kweb-topic-description::placeholder {
+  color: var(--color-ink-faint);
+  font-style: italic;
+}
+
+.kweb-topic-description::selection {
+  background: var(--color-ink-selection);
+}
+
+/* Focus mode: soften chrome around the writing surface */
+.kweb-writing-chrome {
+  transition: opacity 240ms ease;
+}
+
+.kweb-writing-focus .kweb-writing-chrome {
+  opacity: 0.38;
+}
+
+.kweb-writing-focus .kweb-writing-chrome:hover,
+.kweb-writing-focus .kweb-writing-chrome:focus-within {
+  opacity: 1;
+}
+
+/* Shared prose helpers (home / non-editor) */
 .prose h2 {
   font-size: 1.25rem;
   font-weight: 600;
@@ -53,28 +252,4 @@ html {
   background: #f5f5f5;
   padding: 0.1em 0.3em;
   border-radius: 0.25rem;
-}
-
-/* Soft character fade-in while typing in the topic editor */
-@keyframes kweb-type-in {
-  from {
-    opacity: 0.25;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.kweb-editor {
-  caret-color: #171717;
-}
-
-.kweb-editor .kweb-typed {
-  animation: kweb-type-in 160ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kweb-editor .kweb-typed {
-    animation: none;
-  }
 }

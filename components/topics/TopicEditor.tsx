@@ -2,15 +2,16 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bold, Heading2, List, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { TypingAnimation } from "@/lib/editor/typingAnimation";
 
 interface TopicEditorProps {
   content: string;
   onChange: (markdown: string) => void;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 function getMarkdown(editor: ReturnType<typeof useEditor>): string {
@@ -19,12 +20,16 @@ function getMarkdown(editor: ReturnType<typeof useEditor>): string {
   return storage.markdown?.getMarkdown() ?? editor.getText();
 }
 
-export function TopicEditor({ content, onChange }: TopicEditorProps) {
+export function TopicEditor({ content, onChange, onFocusChange }: TopicEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEmitted = useRef(content);
   const pendingMd = useRef<string | null>(null);
   const onChangeRef = useRef(onChange);
+  const onFocusChangeRef = useRef(onFocusChange);
   onChangeRef.current = onChange;
+  onFocusChangeRef.current = onFocusChange;
+  const [focused, setFocused] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushPending = () => {
     if (debounceRef.current) {
@@ -41,26 +46,51 @@ export function TopicEditor({ content, onChange }: TopicEditorProps) {
     onChangeRef.current(md);
   };
 
+  const setWritingFocus = (next: boolean) => {
+    if (blurTimer.current) {
+      clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
+    if (next) {
+      setFocused(true);
+      onFocusChangeRef.current?.(true);
+      return;
+    }
+    // Delay blur so toolbar clicks don't flash focus mode off
+    blurTimer.current = setTimeout(() => {
+      blurTimer.current = null;
+      setFocused(false);
+      onFocusChangeRef.current?.(false);
+    }, 160);
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+      }),
+      Placeholder.configure({
+        placeholder: "Start writing…",
+        emptyEditorClass: "is-editor-empty",
       }),
       Markdown.configure({
         html: false,
         transformPastedText: true,
         transformCopiedText: true,
       }),
-      TypingAnimation,
     ],
     content,
     editorProps: {
       attributes: {
-        class:
-          "prose prose-neutral max-w-none min-h-[320px] px-4 py-3 focus:outline-none text-neutral-800 kweb-editor",
+        class: "kweb-editor prose max-w-none focus:outline-none",
         "aria-label": "Topic content",
       },
+      // Keep the caret in a comfortable vertical band while typing.
+      scrollThreshold: { top: 96, bottom: 140, left: 24, right: 24 },
+      scrollMargin: { top: 140, bottom: 180, left: 0, right: 0 },
     },
+    onFocus: () => setWritingFocus(true),
+    onBlur: () => setWritingFocus(false),
     onUpdate: ({ editor: ed }) => {
       const md = getMarkdown(ed);
       if (md === lastEmitted.current) {
@@ -80,12 +110,10 @@ export function TopicEditor({ content, onChange }: TopicEditorProps) {
     },
   });
 
-  // content is initial-only; parent remounts this editor per topic via key={topicId}
-  // so vault refreshes cannot clobber in-progress edits.
-
   useEffect(() => {
     return () => {
       flushPending();
+      if (blurTimer.current) clearTimeout(blurTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -95,11 +123,12 @@ export function TopicEditor({ content, onChange }: TopicEditorProps) {
   }
 
   return (
-    <div className="flex flex-col rounded-lg border border-neutral-200 bg-white">
+    <div className="kweb-editor-shell" data-focused={focused ? "true" : "false"}>
       <div
-        className="flex flex-wrap gap-1 border-b border-neutral-200 px-2 py-2"
+        className="kweb-editor-toolbar"
         role="toolbar"
         aria-label="Formatting"
+        onMouseDown={() => setWritingFocus(true)}
       >
         <Button
           type="button"

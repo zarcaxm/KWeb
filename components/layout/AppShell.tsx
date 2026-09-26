@@ -72,7 +72,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <UpdateBanner />
 
-          <main id="main-content" className="min-h-0 flex-1 overflow-y-auto">
+          <main id="main-content" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
               <DbGate>{children}</DbGate>
             </div>

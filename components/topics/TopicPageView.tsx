@@ -28,6 +28,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
   const router = useRouter();
   const { refresh } = useDb();
   const { expand } = useExpandedFoldersContext();
+  const [writingFocus, setWritingFocus] = useState(false);
   const [addConnectionOpen, setAddConnectionOpen] = useState(false);
   const [connectionMode, setConnectionMode] = useState<"link" | "create">("link");
   const [moveOpen, setMoveOpen] = useState(false);
@@ -204,14 +205,17 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
   }
 
   return (
-    <article>
-      <Breadcrumbs folders={path ?? []} currentLabel={topic.title} />
+    <article className={writingFocus ? "kweb-writing-focus" : undefined}>
+      <div className="kweb-writing-chrome">
+        <Breadcrumbs folders={path ?? []} currentLabel={topic.title} />
+      </div>
 
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-3">
           <input
-            className="w-full border-0 bg-transparent p-0 text-2xl font-semibold tracking-tight text-neutral-900 placeholder:text-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
+            className="kweb-topic-title w-full border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-400"
             value={title}
+            placeholder="Untitled"
             onChange={(e) => {
               setTitle(e.target.value);
               handleTitleChange(e.target.value);
@@ -228,7 +232,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
           <textarea
             ref={descRef}
             rows={1}
-            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm text-neutral-600 placeholder:text-neutral-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
+            className="kweb-topic-description w-full resize-none overflow-hidden border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-400"
             placeholder="Short description"
             value={description}
             onChange={(e) => {
@@ -245,7 +249,7 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
             aria-label="Topic description"
           />
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="kweb-writing-chrome flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             aria-label={topic.isFavorite ? "Remove from favorites" : "Add to favorites"}
@@ -302,27 +306,30 @@ export function TopicPageView({ topicId }: TopicPageViewProps) {
         </div>
       </div>
 
-      <div className="my-8 border-t border-neutral-200" role="separator" />
+      <div className="kweb-writing-chrome my-8 border-t border-neutral-200" role="separator" />
 
       <TopicEditor
         key={topicId}
         content={topic.content}
+        onFocusChange={setWritingFocus}
         onChange={(md) => {
           void saveField(topicId, { content: md });
         }}
       />
 
-      <RelatedTopics
-        connections={connections ?? []}
-        onAdd={() => {
-          setConnectionMode("link");
-          setAddConnectionOpen(true);
-        }}
-        onCreate={() => {
-          setConnectionMode("create");
-          setAddConnectionOpen(true);
-        }}
-      />
+      <div className="kweb-writing-chrome">
+        <RelatedTopics
+          connections={connections ?? []}
+          onAdd={() => {
+            setConnectionMode("link");
+            setAddConnectionOpen(true);
+          }}
+          onCreate={() => {
+            setConnectionMode("create");
+            setAddConnectionOpen(true);
+          }}
+        />
+      </div>
 
       <AddConnectionDialog
         open={addConnectionOpen}
