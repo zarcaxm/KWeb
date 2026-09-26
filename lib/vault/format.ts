@@ -3,8 +3,9 @@ import type { RelationshipType } from "@/types/models";
 /**
  * On-disk vault format.
  *
- * A vault is a normal folder. Knowledge is files, so a later cloud sync
- * can synchronize the folder itself (each topic file is independent).
+ * A vault is a normal folder. Knowledge is files, so cloud sync
+ * (Google Drive for Desktop, etc.) can synchronize the folder itself.
+ * Each topic file is independent. Open times stay in local app settings.
  *
  * Vault/
  *   .kweb/vault.json          marker { version, format }

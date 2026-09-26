@@ -1,7 +1,12 @@
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::async_runtime;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
+use tauri::{async_runtime, AppHandle, Emitter};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +25,26 @@ pub struct VaultSnapshot {
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Settings {
     vault_path: Option<String>,
+    /// Local-only recent opens: "{vaultRoot}\t{topicId}" -> epoch millis.
+    /// Kept out of synced topic files so Drive does not fight over lastOpenedAt.
+    #[serde(default)]
+    topic_opens: HashMap<String, i64>,
+}
+
+struct WatchState {
+    root: String,
+    _watcher: RecommendedWatcher,
+}
+
+static WATCH_STATE: OnceLock<Mutex<Option<WatchState>>> = OnceLock::new();
+static WATCH_DEBOUNCE_GEN: AtomicU64 = AtomicU64::new(0);
+
+fn watch_state() -> &'static Mutex<Option<WatchState>> {
+    WATCH_STATE.get_or_init(|| Mutex::new(None))
+}
+
+fn topic_open_key(root: &str, topic_id: &str) -> String {
+    format!("{root}\t{topic_id}")
 }
 
 fn settings_dir() -> PathBuf {
@@ -37,6 +62,35 @@ fn settings_file() -> PathBuf {
     settings_dir().join("settings.json")
 }
 
+fn atomic_write(target: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| "Invalid target path".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let file_name = target
+        .file_name()
+        .ok_or_else(|| "Invalid target path".to_string())?;
+    let tmp_name = format!(
+        ".{}.tmp-{}-{}",
+        file_name.to_string_lossy(),
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let tmp = parent.join(tmp_name);
+    if let Err(err) = fs::write(&tmp, bytes) {
+        let _ = fs::remove_file(&tmp);
+        return Err(err.to_string());
+    }
+    if let Err(err) = fs::rename(&tmp, target) {
+        let _ = fs::remove_file(&tmp);
+        return Err(err.to_string());
+    }
+    Ok(())
+}
+
 fn read_settings() -> Settings {
     let Ok(text) = fs::read_to_string(settings_file()) else {
         return Settings::default();
@@ -47,7 +101,7 @@ fn read_settings() -> Settings {
 fn write_settings(settings: &Settings) -> Result<(), String> {
     fs::create_dir_all(settings_dir()).map_err(|e| e.to_string())?;
     let text = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
-    fs::write(settings_file(), text).map_err(|e| e.to_string())
+    atomic_write(&settings_file(), text.as_bytes())
 }
 
 async fn run_blocking<T, F>(task: F) -> Result<T, String>
@@ -220,10 +274,7 @@ pub async fn vault_load(root: String) -> Result<VaultSnapshot, String> {
 pub async fn vault_write(root: String, relative: String, text: String) -> Result<(), String> {
     run_blocking(move || {
         let target = resolve(&root, &relative)?;
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        fs::write(target, text).map_err(|e| e.to_string())
+        atomic_write(&target, text.as_bytes())
     })
     .await
 }
@@ -273,4 +324,118 @@ pub async fn vault_remove_dir(root: String, relative: String) -> Result<(), Stri
         fs::remove_dir(target).map_err(|e| e.to_string())
     })
     .await
+}
+
+#[tauri::command]
+pub async fn record_local_topic_open(
+    root: String,
+    topic_id: String,
+    opened_at: i64,
+) -> Result<(), String> {
+    run_blocking(move || {
+        let mut settings = read_settings();
+        settings
+            .topic_opens
+            .insert(topic_open_key(&root, &topic_id), opened_at);
+        write_settings(&settings)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_local_topic_opens(root: String) -> Result<HashMap<String, i64>, String> {
+    run_blocking(move || {
+        let settings = read_settings();
+        let prefix = format!("{root}\t");
+        let mut opens = HashMap::new();
+        for (key, value) in settings.topic_opens {
+            if let Some(topic_id) = key.strip_prefix(&prefix) {
+                opens.insert(topic_id.to_string(), value);
+            }
+        }
+        Ok(opens)
+    })
+    .await
+}
+
+fn path_is_temp(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|name| name.contains(".tmp-"))
+        .unwrap_or(false)
+}
+
+fn schedule_vault_emit(app: AppHandle, root: String) {
+    let gen = WATCH_DEBOUNCE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(400));
+        if WATCH_DEBOUNCE_GEN.load(Ordering::SeqCst) != gen {
+            return;
+        }
+        let _ = app.emit("vault-external-change", root);
+    });
+}
+
+#[tauri::command]
+pub async fn vault_start_watch(app: AppHandle, root: String) -> Result<(), String> {
+    let root_path = canonicalize_dir(Path::new(&root))?;
+    let root_string = root_path.to_string_lossy().to_string();
+
+    {
+        let mut guard = watch_state()
+            .lock()
+            .map_err(|_| "Vault watch lock poisoned".to_string())?;
+        if let Some(existing) = guard.as_ref() {
+            if existing.root == root_string {
+                return Ok(());
+            }
+        }
+        *guard = None;
+    }
+
+    let app_for_watch = app.clone();
+    let watched_root = root_string.clone();
+    let mut watcher = notify::recommended_watcher(move |result: Result<notify::Event, notify::Error>| {
+        let Ok(event) = result else {
+            return;
+        };
+        match event.kind {
+            EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {}
+            _ => return,
+        }
+        let relevant = event.paths.iter().any(|path| {
+            if path_is_temp(path) {
+                return false;
+            }
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            name.ends_with(".md") || name == ".kweb.json" || name == "vault.json"
+        });
+        if relevant {
+            schedule_vault_emit(app_for_watch.clone(), watched_root.clone());
+        }
+    })
+    .map_err(|e| e.to_string())?;
+
+    watcher
+        .watch(&root_path, RecursiveMode::Recursive)
+        .map_err(|e| e.to_string())?;
+
+    let mut guard = watch_state()
+        .lock()
+        .map_err(|_| "Vault watch lock poisoned".to_string())?;
+    *guard = Some(WatchState {
+        root: root_string,
+        _watcher: watcher,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn vault_stop_watch() -> Result<(), String> {
+    let mut guard = watch_state()
+        .lock()
+        .map_err(|_| "Vault watch lock poisoned".to_string())?;
+    *guard = None;
+    WATCH_DEBOUNCE_GEN.fetch_add(1, Ordering::SeqCst);
+    Ok(())
 }

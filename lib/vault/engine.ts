@@ -14,8 +14,10 @@ import {
   type TopicLinkMeta,
 } from "@/lib/vault/format";
 import {
+  getLocalTopicOpens,
   loadVaultSnapshot,
   makeVaultDir,
+  recordLocalTopicOpen,
   removeVaultDir,
   removeVaultFile,
   renameVaultPath,
@@ -141,7 +143,8 @@ async function persistTopic(vault: VaultState, rec: TopicRec): Promise<void> {
     favorite: rec.topic.isFavorite,
     createdAt: rec.topic.createdAt,
     updatedAt: rec.topic.updatedAt,
-    lastOpenedAt: rec.topic.lastOpenedAt,
+    // Open times live in local app settings so Drive sync does not churn topic files.
+    lastOpenedAt: null,
     connections: rec.links,
   };
   await writeVaultText(vault.root, rec.fileRel, serializeTopicFile(meta, rec.topic.content));
@@ -301,6 +304,7 @@ export async function openVault(root: string): Promise<void> {
       );
     }
     const built = buildIndex(root, snapshot);
+    await applyLocalOpens(built.vault);
     state = built.vault;
     for (const rec of built.folderWrites) {
       await persistFolderMeta(built.vault, rec);
@@ -310,6 +314,38 @@ export async function openVault(root: string): Promise<void> {
     }
     await setLastVault(root);
   });
+}
+
+/** Rebuild the in-memory index from disk (e.g. after Drive/external sync). */
+export async function reloadVaultFromDisk(): Promise<void> {
+  await enqueue(async () => {
+    if (!state) return;
+    const root = state.root;
+    const snapshot = await loadVaultSnapshot(root);
+    const built = buildIndex(root, snapshot);
+    await applyLocalOpens(built.vault);
+    state = built.vault;
+    for (const rec of built.folderWrites) {
+      await persistFolderMeta(built.vault, rec);
+    }
+    for (const rec of built.topicWrites) {
+      await persistTopic(built.vault, rec);
+    }
+  });
+}
+
+async function applyLocalOpens(vault: VaultState): Promise<void> {
+  try {
+    const opens = await getLocalTopicOpens(vault.root);
+    for (const rec of vault.topics.values()) {
+      const local = opens[rec.topic.id];
+      if (typeof local === "number") {
+        rec.topic.lastOpenedAt = local;
+      }
+    }
+  } catch {
+    // Browser / missing command: keep frontmatter fallback values.
+  }
 }
 
 export function closeVault(): void {
@@ -504,8 +540,13 @@ export async function recordTopicOpen(id: string): Promise<Topic | undefined> {
     const vault = requireVault();
     const rec = vault.topics.get(id);
     if (!rec) return undefined;
-    rec.topic.lastOpenedAt = Date.now();
-    await persistTopic(vault, rec);
+    const openedAt = Date.now();
+    rec.topic.lastOpenedAt = openedAt;
+    try {
+      await recordLocalTopicOpen(vault.root, id, openedAt);
+    } catch {
+      // Desktop settings write failed; keep in-memory value for this session.
+    }
     return rec.topic;
   });
 }

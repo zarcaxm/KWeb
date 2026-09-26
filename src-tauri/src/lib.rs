@@ -1,8 +1,9 @@
 mod vault;
 
 use vault::{
-    get_last_vault, pick_directory, set_last_vault, vault_load, vault_mkdir, vault_remove_dir,
-    vault_remove_file, vault_rename, vault_write,
+    get_last_vault, get_local_topic_opens, pick_directory, record_local_topic_open, set_last_vault,
+    vault_load, vault_mkdir, vault_remove_dir, vault_remove_file, vault_rename, vault_start_watch,
+    vault_stop_watch, vault_write,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +31,11 @@ pub fn run() {
             vault_mkdir,
             vault_rename,
             vault_remove_file,
-            vault_remove_dir
+            vault_remove_dir,
+            record_local_topic_open,
+            get_local_topic_opens,
+            vault_start_watch,
+            vault_stop_watch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

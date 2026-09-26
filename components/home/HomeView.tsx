@@ -62,6 +62,14 @@ export function HomeView() {
         <p className="mt-2 text-sm text-neutral-600">
           Quick access to your knowledge workspace.
         </p>
+        <p className="mt-2 text-sm text-neutral-500">
+          Cloud sync: put this vault folder inside Google Drive (or another sync client).
+          KWeb reads and writes local files; Drive syncs the folder. Avoid editing the same
+          topic on two devices at once. Folder names like{" "}
+          <code className="text-xs">build</code>, <code className="text-xs">dist</code>,{" "}
+          <code className="text-xs">out</code>, and <code className="text-xs">target</code>{" "}
+          are ignored.
+        </p>
         {showDev ? (
           <Button className="mt-4" variant="secondary" onClick={handleSeed} disabled={seeding}>
             Load sample data

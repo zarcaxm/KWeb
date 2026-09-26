@@ -16,9 +16,24 @@ My Vault/
 - Folders are directories.
 - Topics are Markdown files. The title, description, favorite flag, dates, and outgoing connections sit in a JSON frontmatter block. The body is what you know about the subject.
 - A topic can relate to topics in other folders. The folder path and the connection are independent.
-- A later cloud sync can synchronize this folder. Each topic file can sync on its own.
+- Cloud sync works by synchronizing this folder (for example with Google Drive for Desktop). Each topic file can sync on its own.
 
-The last opened vault path is remembered in `%APPDATA%\KWeb\settings.json` on Windows or `${XDG_CONFIG_HOME:-~/.config}/KWeb/settings.json` on Linux. That file is app settings, not your knowledge.
+The last opened vault path and local “recently opened” timestamps are remembered in `%APPDATA%\KWeb\settings.json` on Windows or `${XDG_CONFIG_HOME:-~/.config}/KWeb/settings.json` on Linux. That file is app settings, not your knowledge, and is not part of the vault.
+
+## Cloud sync (Google Drive)
+
+KWeb does not talk to the Google Drive API. Use Drive for Desktop (or another folder sync client):
+
+1. Create or move your vault folder inside a Google Drive synced directory.
+2. In KWeb, open that same folder as the vault.
+3. On another machine, wait for Drive to finish syncing, then open the same folder in KWeb.
+
+Notes:
+
+- Prefer not to edit the same topic on two devices at the same time. Title renames change the `.md` filename and can confuse sync if both sides rename.
+- “Recently opened” is stored in local app settings so opening a topic does not rewrite synced files.
+- Vault folder names `build`, `dist`, `out`, `target`, `node_modules`, and similar tool directories are skipped when scanning.
+- The desktop app watches the vault folder and reloads when Drive (or another process) changes files on disk.
 
 ## Requirements
 

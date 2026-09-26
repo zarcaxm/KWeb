@@ -58,3 +58,29 @@ export function removeVaultFile(root: string, relative: string): Promise<void> {
 export function removeVaultDir(root: string, relative: string): Promise<void> {
   return invoke("vault_remove_dir", { root, relative });
 }
+
+export function recordLocalTopicOpen(
+  root: string,
+  topicId: string,
+  openedAt: number
+): Promise<void> {
+  return invoke("record_local_topic_open", {
+    root,
+    topicId,
+    openedAt,
+  });
+}
+
+export function getLocalTopicOpens(
+  root: string
+): Promise<Record<string, number>> {
+  return invoke("get_local_topic_opens", { root });
+}
+
+export function startVaultWatch(root: string): Promise<void> {
+  return invoke("vault_start_watch", { root });
+}
+
+export function stopVaultWatch(): Promise<void> {
+  return invoke("vault_stop_watch");
+}

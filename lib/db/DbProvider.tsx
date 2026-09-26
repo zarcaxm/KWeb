@@ -9,8 +9,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getLastVault, isDesktopApp, pickDirectory } from "@/lib/vault/fs";
-import { openVault } from "@/lib/vault/engine";
+import {
+  getLastVault,
+  isDesktopApp,
+  pickDirectory,
+  startVaultWatch,
+  stopVaultWatch,
+} from "@/lib/vault/fs";
+import { openVault, reloadVaultFromDisk } from "@/lib/vault/engine";
 
 type DbContextValue = {
   ready: boolean;
@@ -64,6 +70,36 @@ export function DbProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isDesktop || !vaultPath) return;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    (async () => {
+      try {
+        await startVaultWatch(vaultPath);
+        if (cancelled) return;
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen<string>("vault-external-change", async () => {
+          try {
+            await reloadVaultFromDisk();
+            refresh();
+          } catch (err) {
+            console.warn("Vault reload after external change failed", err);
+          }
+        });
+      } catch (err) {
+        console.warn("Vault watch failed", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+      void stopVaultWatch();
+    };
+  }, [isDesktop, vaultPath, refresh]);
 
   const openOrCreateVault = useCallback(async () => {
     setOpening(true);
